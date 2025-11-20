@@ -5,12 +5,22 @@
 
 # Read more: https://github.com/cyu/rack-cors
 
-# Rails.application.config.middleware.insert_before 0, Rack::Cors do
-#   allow do
-#     origins "example.com"
-#
-#     resource "*",
-#       headers: :any,
-#       methods: [:get, :post, :put, :patch, :delete, :options, :head]
-#   end
-# end
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    # Allow localhost and all ngrok domains
+    origins(
+      "http://localhost:5173",
+      "http://localhost:3000",
+      /https?:\/\/.*\.ngrok(-free)?\.app/,
+      /https?:\/\/.*\.ngrok-free\.app/,
+      /https?:\/\/.*\.ngrok-free\.dev/,
+      /https?:\/\/.*\.ngrok\.app/,
+      /https?:\/\/.*\.ngrok\.io/
+    )
+
+    resource "*",
+      headers: :any,
+      methods: [:get, :post, :put, :patch, :delete, :options, :head],
+      credentials: true
+  end
+end

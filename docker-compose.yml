@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     container_name: livechat_db
     environment:
-      POSTGRES_USER: everchron_dev
+      POSTGRES_USER: dev
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: livechat
     ports:
@@ -11,7 +11,7 @@ services:
     volumes:
       - livechat_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U everchron_dev"]
+      test: ["CMD-SHELL", "pg_isready -U dev"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,15 +21,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: api
-    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails db:prepare && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    command: bash -c "rm -f tmp/pids/server.pid && rm -rf tmp/cache/bootsnap && bundle exec rails db:migrate && bundle exec rails s -p 3000 -b '0.0.0.0'"
     environment:
       RAILS_ENV: development
-      DATABASE_URL: postgresql://everchron_dev:postgres@db:5432/livechat
-      DATABASE_HOST: db
-      DATABASE_USERNAME: everchron_dev
-      DATABASE_PASSWORD: postgres
-      DATABASE_NAME: livechat
-      DATABASE_PORT: 5432
+      DATABASE_URL: postgresql://dev:postgres@db:5432/livechat
       RAILS_MASTER_KEY: ${RAILS_MASTER_KEY:-}
     ports:
       - "3000:3000"
@@ -51,7 +46,7 @@ services:
     command: npm run dev -- --host
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:3000
+      - DOCKER=true
     ports:
       - "5173:5173"
     volumes:

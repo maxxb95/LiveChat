@@ -62,8 +62,22 @@ Rails.application.configure do
   # Annotate rendered view with file names.
   config.action_view.annotate_rendered_view_with_filenames = true
 
-  # Uncomment if you wish to allow Action Cable access from any origin.
-  # config.action_cable.disable_request_forgery_protection = true
+  # Allow requests from any host in development (for Docker and ngrok)
+  # This is safe in development but should be restricted in production
+  config.hosts.clear
+
+  # Allow Action Cable access from any origin in development
+  config.action_cable.disable_request_forgery_protection = true
+  # Allow localhost and all ngrok domains for ActionCable
+  config.action_cable.allowed_request_origins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    /https?:\/\/.*\.ngrok(-free)?\.app/,
+    /https?:\/\/.*\.ngrok-free\.app/,
+    /https?:\/\/.*\.ngrok-free\.dev/,
+    /https?:\/\/.*\.ngrok\.app/,
+    /https?:\/\/.*\.ngrok\.io/
+  ]
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
