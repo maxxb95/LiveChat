@@ -7,4 +7,8 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+
+  # Test routes for frontend-backend connectivity
+  get "test", to: "test#index"
+  post "test", to: "test#create"
 end
