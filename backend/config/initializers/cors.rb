@@ -10,12 +10,8 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
     # Allow localhost and all ngrok domains
     origins(
       "http://localhost:5173",
-      "http://localhost:3000",
-      /https?:\/\/.*\.ngrok(-free)?\.app/,
-      /https?:\/\/.*\.ngrok-free\.app/,
-      /https?:\/\/.*\.ngrok-free\.dev/,
-      /https?:\/\/.*\.ngrok\.app/,
-      /https?:\/\/.*\.ngrok\.io/
+      "http://127.0.0.1:5173",
+      /https?:\/\/.*\.ngrok-free\.dev/
     )
 
     resource "*",

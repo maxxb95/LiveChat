@@ -15,6 +15,10 @@ Rails.application.configure do
   # Enable server timing.
   config.server_timing = true
 
+  # Allow frontend docker service and ngrok domain when routing through proxy.
+  config.hosts << "api:3000"
+  config.hosts << /.*\.ngrok-free\.dev/
+
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.
   if Rails.root.join("tmp/caching-dev.txt").exist?
@@ -62,21 +66,11 @@ Rails.application.configure do
   # Annotate rendered view with file names.
   config.action_view.annotate_rendered_view_with_filenames = true
 
-  # Allow requests from any host in development (for Docker and ngrok)
-  # This is safe in development but should be restricted in production
-  config.hosts.clear
-
-  # Allow Action Cable access from any origin in development
-  config.action_cable.disable_request_forgery_protection = true
-  # Allow localhost and all ngrok domains for ActionCable
+  # Allow ActionCable connections from these origins
   config.action_cable.allowed_request_origins = [
     'http://localhost:5173',
-    'http://localhost:3000',
-    /https?:\/\/.*\.ngrok(-free)?\.app/,
-    /https?:\/\/.*\.ngrok-free\.app/,
-    /https?:\/\/.*\.ngrok-free\.dev/,
-    /https?:\/\/.*\.ngrok\.app/,
-    /https?:\/\/.*\.ngrok\.io/
+    'http://127.0.0.1:5173',
+    /https?:\/\/.*\.ngrok-free\.dev/
   ]
 
   # Raise error when a before_action's only/except options reference missing actions.

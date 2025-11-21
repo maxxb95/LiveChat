@@ -12,6 +12,8 @@ Rails.application.routes.draw do
   namespace :api do
     # Messages API
     resources :messages, only: [:index, :create]
+    # Get current user's IP address
+    get 'ip', to: 'ip#show'
   end
 
   # Defines the root path route ("/")

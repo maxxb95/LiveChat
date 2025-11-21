@@ -2,16 +2,18 @@
   <div class="chat-container">
     <div class="chat-header">
       <h1>Chat</h1>
-      <div class="chat-status">
-        <span :class="['status-indicator', isConnected ? 'connected' : 'disconnected']"></span>
-        <span class="status-text">
-          {{ isConnected ? 'Connected' : 'Disconnected' }}
+      <div class="connection-status">
+        <span
+          :class="['status-indicator', isConnected ? 'status-connected' : 'status-disconnected']"
+          :title="isConnected ? 'Connected' : 'Disconnected'"
+        >
+          <span class="status-dot"></span>
+          <span class="status-text">{{ isConnected ? 'Connected' : 'Disconnected' }}</span>
         </span>
-        <button @click="resetSession" class="reset-btn" title="Reset Session">🔄</button>
       </div>
     </div>
 
-    <div v-if="error" class="error-message">
+    <div v-if="error && isConnected" class="error-message">
       {{ error }}
     </div>
 
@@ -23,11 +25,11 @@
       <div
         v-for="message in messages"
         :key="message.id"
-        :class="['message', message.is_mine ? 'message-mine' : 'message-other']"
+        :class="['message', isMyMessage(message) ? 'message-mine' : 'message-other']"
       >
         <div class="message-header">
           <span class="message-username">
-            {{ message.username || 'Anonymous' }}
+            {{ getMessageLabel(message) }}
           </span>
           <span class="message-time">
             {{ formatTime(message.created_at) }}
@@ -37,62 +39,66 @@
       </div>
     </div>
 
+    <div v-if="typingUsersList.length > 0" class="typing-indicator">
+      <span class="typing-text">
+        <span v-for="(user, index) in typingUsersList" :key="index">
+          {{ user }}<span v-if="index < typingUsersList.length - 1">, </span>
+        </span>
+        <span v-if="typingUsersList.length === 1"> is typing...</span>
+        <span v-else> are typing...</span>
+      </span>
+    </div>
+
     <div class="chat-input-container">
-      <div class="input-group">
+      <div class="message-input-wrapper">
         <input
-          v-model="username"
+          ref="messageInput"
+          v-model="messageText"
           type="text"
-          placeholder="Your name (optional)"
-          class="username-input"
-          @keyup.enter="focusMessageInput"
+          placeholder="Type a message..."
+          class="message-input"
+          :disabled="isLoading"
+          @input="handleTyping"
+          @keydown="handleTyping"
+          @keyup.enter="handleSendMessage"
         />
-        <div class="message-input-wrapper">
-          <input
-            ref="messageInput"
-            v-model="messageText"
-            type="text"
-            placeholder="Type a message..."
-            class="message-input"
-            :disabled="isLoading"
-            @keyup.enter="handleSendMessage"
-          />
-          <button
-            @click="handleSendMessage"
-            :disabled="isLoading || !messageText.trim()"
-            class="send-button"
-          >
-            Send
-          </button>
-        </div>
+        <button
+          @click="handleSendMessage"
+          :disabled="isLoading || !messageText.trim()"
+          class="send-button"
+        >
+          Send
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { formatDistanceToNow } from 'date-fns'
 import { useChatStore } from '../stores/chat'
 
 const chatStore = useChatStore()
-const {
-  messages,
-  isConnected,
-  isLoading,
-  error,
-  hasMessages,
-  connect,
-  disconnect,
-  fetchMessages,
-  sendMessage,
-  resetSession: resetChatSession,
-} = chatStore
+// Use storeToRefs to maintain reactivity when destructuring
+const { messages, isLoading, error, hasMessages, isConnected, typingUsers } = storeToRefs(chatStore)
+const { connect, disconnect, fetchMessages, sendMessage, sendTypingStatus, clearTypingStatus } =
+  chatStore
 
 const messageText = ref('')
-const username = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const messageInput = ref<HTMLInputElement | null>(null)
 
-// Scroll to bottom when new messages arrive
+let typingTimeout: ReturnType<typeof setTimeout> | null = null
+const TYPING_TIMEOUT = 3000
+
+// List of typing users (excluding self)
+const typingUsersList = computed(() => {
+  return Array.from(typingUsers.value).map(() => 'Anonymous')
+})
+
+// Scroll to bottom of chat window when new messages arrive
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -113,16 +119,48 @@ const focusMessageInput = () => {
   messageInput.value?.focus()
 }
 
+const getMessageLabel = (message: { normalized_ip?: string; ip_address?: string }) => {
+  return isMyMessage(message) ? 'You' : 'Anonymous'
+}
+
+const isMyMessage = (message: { normalized_ip?: string; ip_address?: string }) => {
+  // Check if message is from user's IP using normalized IP for IPv6 privacy extension handling
+  const userNormalizedIp = chatStore.userNormalizedIp
+  const messageNormalizedIp = message.normalized_ip || message.ip_address
+  return userNormalizedIp && messageNormalizedIp === userNormalizedIp
+}
+
+const handleTyping = () => {
+  sendTypingStatus(true)
+
+  if (typingTimeout) {
+    clearTimeout(typingTimeout)
+  }
+
+  // Set timeout to send typing stopped after inactivity
+  typingTimeout = setTimeout(() => {
+    sendTypingStatus(false)
+    typingTimeout = null
+  }, TYPING_TIMEOUT)
+}
+
 const handleSendMessage = async () => {
   if (!messageText.value.trim() || isLoading.value) {
     return
   }
 
+  if (typingTimeout) {
+    clearTimeout(typingTimeout)
+    typingTimeout = null
+  }
+  sendTypingStatus(false)
+  clearTypingStatus()
+
   const content = messageText.value
   messageText.value = ''
 
   try {
-    await sendMessage(content, username.value || undefined)
+    await sendMessage(content)
     focusMessageInput()
   } catch (err) {
     // Error is already set in the store
@@ -131,40 +169,24 @@ const handleSendMessage = async () => {
 }
 
 const formatTime = (dateString: string) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-
-  if (seconds < 60) {
-    return 'just now'
-  } else if (minutes < 60) {
-    return `${minutes}m ago`
-  } else if (hours < 24) {
-    return `${hours}h ago`
-  } else {
-    return date.toLocaleDateString()
+  if (dateString) {
+    const date = new Date(dateString)
+    return formatDistanceToNow(date, { addSuffix: true })
   }
-}
-
-const resetSession = () => {
-  if (confirm('Reset your session? You will get a new session ID.')) {
-    resetChatSession()
-    fetchMessages()
-  }
+  return dateString
 }
 
 onMounted(async () => {
   connect()
-  console.log('Fetching messages on mount...')
   await fetchMessages()
-  console.log('Messages after fetch:', messages.length)
   focusMessageInput()
 })
 
 onUnmounted(() => {
+  if (typingTimeout) {
+    clearTimeout(typingTimeout)
+    sendTypingStatus(false)
+  }
   disconnect()
 })
 </script>
@@ -174,10 +196,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 800px;
-  margin: 0 auto;
+  height: 100dvh; /* Dynamic viewport height for mobile browsers */
+  width: 100vw;
+  width: 100dvw; /* Dynamic viewport width for mobile browsers */
   background: #fff;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .chat-header {
@@ -187,34 +214,88 @@ onUnmounted(() => {
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #e0e0e0;
   background: #f8f9fa;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .chat-header h1 {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
+  color: #333;
 }
 
-.chat-status {
+.connection-status {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
 }
 
 .status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #dc3545;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  transition: all 0.2s;
 }
 
-.status-indicator.connected {
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 2s infinite;
+}
+
+.status-connected .status-dot {
   background: #28a745;
+  box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+}
+
+.status-disconnected .status-dot {
+  background: #dc3545;
+  box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+  animation: pulse-red 2s infinite;
 }
 
 .status-text {
-  font-size: 0.875rem;
-  color: #666;
+  font-weight: 500;
+}
+
+.status-connected {
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.1);
+}
+
+.status-disconnected {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgba(40, 167, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+  }
+}
+
+@keyframes pulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgba(220, 53, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+  }
 }
 
 .reset-btn {
@@ -311,23 +392,28 @@ onUnmounted(() => {
   line-height: 1.4;
 }
 
+.typing-indicator {
+  padding: 0.5rem 1.5rem;
+  background: #f0f0f0;
+  border-top: 1px solid #e0e0e0;
+  font-size: 0.875rem;
+  color: #666;
+  font-style: italic;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+}
+
+.typing-text {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .chat-input-container {
   padding: 1rem 1.5rem;
   border-top: 1px solid #e0e0e0;
   background: #f8f9fa;
-}
-
-.input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.username-input {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 0.875rem;
 }
 
 .message-input-wrapper {

@@ -14,6 +14,8 @@ A live chat interface built with Rails API backend and Vue.js frontend.
 - Docker and Docker Compose installed
 - Git
 
+**Note**: This README uses `docker-compose` in examples, but newer Docker installations use `docker compose` (with a space instead of a hyphen). If `docker-compose` doesn't work, try `docker compose` instead. Both commands are functionally equivalent.
+
 ## Getting Started
 
 ### 1. Clone the Repository
@@ -40,6 +42,7 @@ docker-compose up -d
 ### 3. Database Initialization
 
 The database is automatically created and migrated when the API container starts. The Rails entrypoint script runs `rails db:prepare`, which:
+
 - Creates the database if it doesn't exist
 - Runs pending migrations automatically
 - Does nothing if the database is already up to date
@@ -155,76 +158,49 @@ docker-compose exec frontend npm run lint
 docker-compose exec db psql -U dev -d livechat
 ```
 
-## Exposing with ngrok
+## Exposing the Frontend with ngrok
 
-To expose your local development server to the internet (useful for testing with external devices or sharing with others):
+To expose the frontend development server to the internet (e.g., for testing on mobile devices or sharing with others), you can use ngrok:
 
-### Quick Start
+### Setup
 
-1. **Prerequisites**:
+1. **Install ngrok** (if not already installed):
+   - Download from: https://ngrok.com/download
+   - Or install via Homebrew: `brew install ngrok`
+
+2. **Start the application** (if not already running):
+
    ```bash
-   # Install ngrok
-   brew install ngrok  # macOS
-   # or download from https://ngrok.com/download
-   
-   # Sign up and get authtoken from https://dashboard.ngrok.com/get-started/your-authtoken
-   ngrok config add-authtoken YOUR_AUTHTOKEN
+   docker-compose up
    ```
 
-2. **Start your Docker containers**:
+3. **Expose the frontend with ngrok**:
+
    ```bash
-   docker compose up -d
+   ngrok http 5173
    ```
 
-3. **Run the ngrok script**:
-   ```bash
-   ./scripts/ngrok.sh
-   ```
+   This will create a public URL (e.g., `https://abc123.ngrok-free.dev`) that forwards to your local frontend on port 5173.
 
-4. **Share the URL**: The script will output a single shareable URL that includes everything needed. Just copy and share it!
+### Configuration
 
-   Example output:
-   ```
-   📋 SHARE THIS URL (includes backend automatically):
-   https://frontend-xyz.ngrok-free.app?backend=https://backend-abc.ngrok-free.app
-   ```
+The application is pre-configured to accept requests from any `*.ngrok-free.dev` domain via regex patterns in the following files:
 
-   **Note**: On first visit, ngrok-free domains show a warning page - click "Visit Site" to proceed.
+- **`backend/config/environments/development.rb`**:
+  - `config.hosts << /.*\.ngrok-free\.dev/` - Allows Rails to accept requests from ngrok domains
+  - `config.action_cable.allowed_request_origins` includes `/https?:\/\/.*\.ngrok-free\.dev/` - Allows WebSocket connections from ngrok domains
 
-### How It Works
+- **`backend/config/initializers/cors.rb`**:
+  - Includes `/https?:\/\/.*\.ngrok-free\.dev/` in the `origins` list - Allows CORS requests from ngrok domains
 
-- The script automatically starts both **frontend** (port 5173) and **backend** (port 3000) tunnels via ngrok
-- It generates a single shareable URL with the backend URL included as a parameter
-- The frontend automatically detects it's on ngrok and reads the backend URL from the `?backend=` parameter
-- The backend URL is stored in sessionStorage, so it persists across page refreshes
-- **Remote devices** (like phones) can access both services through their ngrok URLs
+- **`frontend/vite.config.ts`**:
+  - `allowedHosts: ['.ngrok-free.dev']` - Allows Vite dev server to accept requests from ngrok domains
 
-### Important Notes
+**Note**: If you're using a different ngrok domain pattern (e.g., `*.ngrok.io` or a custom domain), you'll need to update these regex patterns accordingly. After making changes, restart the backend container:
 
-- **ngrok URLs change** each time you restart ngrok (unless you have a paid plan with a static domain)
-- **WebSocket support**: ngrok supports WebSockets, so ActionCable will work through ngrok
-- **CORS & ActionCable**: The backend is already configured to accept requests from ngrok domains
-- **Vite allowedHosts**: The frontend is configured to allow ngrok domains in `vite.config.ts`
-- **Security**: Only use ngrok for development/testing. Never expose production servers this way without proper authentication
-
-### Troubleshooting
-
-- **"The site can't provide a secure connection"**: 
-  - Make sure you're using the **HTTPS** URL from ngrok (not HTTP)
-  - On first visit, ngrok-free domains show a warning page - click "Visit Site" to proceed
-  - Make sure both backend and frontend are exposed via ngrok (not just frontend)
-  - The shareable URL must include the `?backend=` parameter
-
-- **Frontend can't connect to backend**:
-  - Verify the shareable URL includes `?backend=YOUR_BACKEND_NGROK_URL`
-  - Check browser console for errors
-  - Make sure both ngrok tunnels are running
-
-- **Vite host warning**: The ngrok domain is already configured in `vite.config.ts` - this warning can be ignored
-
-- **CORS errors**: The backend is already configured for ngrok domains, but verify `backend/config/initializers/cors.rb`
-
-- **WebSocket connection fails**: Check `backend/config/environments/development.rb` for ActionCable origins
+```bash
+docker-compose restart api
+```
 
 ## Development
 
@@ -232,13 +208,13 @@ To expose your local development server to the internet (useful for testing with
 
 - Backend code is mounted as a volume, so changes are reflected immediately
 - Rails server auto-reloads on code changes
-- Logs are available via `docker compose logs -f api`
+- Logs are available via `docker-compose logs -f api`
 
 ### Frontend Development
 
 - Frontend code is mounted as a volume with hot module replacement
 - Changes to Vue components are reflected immediately in the browser
-- Logs are available via `docker compose logs -f frontend`
+- Logs are available via `docker-compose logs -f frontend`
 
 ## Project Structure
 
@@ -254,3 +230,43 @@ LiveChat/
 │   └── package.json
 └── docker-compose.yml
 ```
+
+## Current Limitations
+
+- **Message Length**: Maximum 10,000 characters per message
+- **User Identification**: Users are identified by IP address (normalized for IPv6 privacy extensions)
+- **Rate Limiting**: No rate limiting is currently implemented
+- **Authentication**: No user authentication system
+- **Message History**: Limited to 100 messages per page (pagination supported)
+
+## Future Enhancements
+
+### Authentication & User Management
+
+- Implement user authentication (sign in/sign up), or integrate with existing auth systems for larger applications
+- Allow users to set custom display names, or get display name from session
+- User profiles and avatars
+
+### Chat Features
+
+- **Multiple Chat Rooms**:
+  - Add `ChatRoom` model with foreign key association to messages
+  - Room-based message filtering and routing
+- **Message Reactions**: Emoji reactions to messages
+- **File Attachments**: Support for image/file sharing
+- **Message Editing/Deletion**: Allow users to edit or delete their own messages
+- **Message comment threads**: Comment directly on a specific message to start a thread
+- **Handle failed message sends**: Show grey message with red exclamation point if it didn't send successfully
+
+### Performance & UX
+
+- **Infinite Scroll**: Implement infinite scroll in the frontend using the paginated messages API
+- **Message Search**: Search functionality for finding specific messages
+- **Message Persistence**: Configurable message retention policies
+- **Connection Recovery**: Automatic message recovery when reconnecting after disconnection
+
+### Security & Reliability
+
+- **Rate Limiting**: Implement rate limiting to prevent spam and abuse
+- **Message Encryption**: End-to-end encryption for sensitive conversations
+- **Audit Logging**: Track message history and user actions
