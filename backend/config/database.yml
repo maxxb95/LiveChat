@@ -22,11 +22,16 @@ default: &default
 
 development:
   <<: *default
+  # DATABASE_URL takes precedence - Rails will use it automatically if set
+  # Only use these individual settings if DATABASE_URL is not provided
+  <% if ENV['DATABASE_URL'].blank? %>
   database: <%= ENV.fetch("DATABASE_NAME") { "livechat" } %>
-  username: <%= ENV.fetch("DATABASE_USERNAME") { "everchron_dev" } %>
+  username: <%= ENV.fetch("DATABASE_USERNAME") { "dev" } %>
   password: <%= ENV.fetch("DATABASE_PASSWORD") { "postgres" } %>
-  host: <%= ENV.fetch("DATABASE_HOST") { "localhost" } %>
+  host: <%= ENV.fetch("DATABASE_HOST") { "db" } %>
   port: <%= ENV.fetch("DATABASE_PORT") { "5432" } %>
+  <% end %>
+  connect_timeout: 5
 
   # Schema search path. The server defaults to $user,public
   #schema_search_path: myapp,sharedapp,public

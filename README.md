@@ -14,6 +14,8 @@ A live chat interface built with Rails API backend and Vue.js frontend.
 - Docker and Docker Compose installed
 - Git
 
+**Note**: This README uses `docker-compose` in examples, but newer Docker installations use `docker compose` (with a space instead of a hyphen). If `docker-compose` doesn't work, try `docker compose` instead. Both commands are functionally equivalent.
+
 ## Getting Started
 
 ### 1. Clone the Repository
@@ -40,6 +42,7 @@ docker-compose up -d
 ### 3. Database Initialization
 
 The database is automatically created and migrated when the API container starts. The Rails entrypoint script runs `rails db:prepare`, which:
+
 - Creates the database if it doesn't exist
 - Runs pending migrations automatically
 - Does nothing if the database is already up to date
@@ -76,7 +79,7 @@ docker-compose exec api bundle exec rails db:create db:migrate
 - **Host**: localhost
 - **Port**: 5432
 - **Database**: `livechat`
-- **Username**: `everchron_dev`
+- **Username**: `dev`
 - **Password**: `postgres`
 - **Container**: `livechat_db`
 
@@ -93,7 +96,7 @@ docker-compose exec api bundle exec rails db:create db:migrate
      - Host name/address: `localhost`
      - Port: `5432`
      - Maintenance database: `livechat`
-     - Username: `everchron_dev`
+     - Username: `dev`
      - Password: `postgres`
    - Click "Save"
 
@@ -152,7 +155,51 @@ docker-compose exec frontend npm run lint
 
 ```bash
 # Connect to PostgreSQL
-docker-compose exec db psql -U everchron_dev -d livechat
+docker-compose exec db psql -U dev -d livechat
+```
+
+## Exposing the Frontend with ngrok
+
+To expose the frontend development server to the internet (e.g., for testing on mobile devices or sharing with others), you can use ngrok:
+
+### Setup
+
+1. **Install ngrok** (if not already installed):
+   - Download from: https://ngrok.com/download
+   - Or install via Homebrew: `brew install ngrok`
+
+2. **Start the application** (if not already running):
+
+   ```bash
+   docker-compose up
+   ```
+
+3. **Expose the frontend with ngrok**:
+
+   ```bash
+   ngrok http 5173
+   ```
+
+   This will create a public URL (e.g., `https://abc123.ngrok-free.dev`) that forwards to your local frontend on port 5173.
+
+### Configuration
+
+The application is pre-configured to accept requests from any `*.ngrok-free.dev` domain via regex patterns in the following files:
+
+- **`backend/config/environments/development.rb`**:
+  - `config.hosts << /.*\.ngrok-free\.dev/` - Allows Rails to accept requests from ngrok domains
+  - `config.action_cable.allowed_request_origins` includes `/https?:\/\/.*\.ngrok-free\.dev/` - Allows WebSocket connections from ngrok domains
+
+- **`backend/config/initializers/cors.rb`**:
+  - Includes `/https?:\/\/.*\.ngrok-free\.dev/` in the `origins` list - Allows CORS requests from ngrok domains
+
+- **`frontend/vite.config.ts`**:
+  - `allowedHosts: ['.ngrok-free.dev']` - Allows Vite dev server to accept requests from ngrok domains
+
+**Note**: If you're using a different ngrok domain pattern (e.g., `*.ngrok.io` or a custom domain), you'll need to update these regex patterns accordingly. After making changes, restart the backend container:
+
+```bash
+docker-compose restart api
 ```
 
 ## Development
@@ -183,3 +230,43 @@ LiveChat/
 │   └── package.json
 └── docker-compose.yml
 ```
+
+## Current Limitations
+
+- **Message Length**: Maximum 10,000 characters per message
+- **User Identification**: Users are identified by IP address (normalized for IPv6 privacy extensions)
+- **Rate Limiting**: No rate limiting is currently implemented
+- **Authentication**: No user authentication system
+- **Message History**: Limited to 100 messages per page (pagination supported)
+
+## Future Enhancements
+
+### Authentication & User Management
+
+- Implement user authentication (sign in/sign up), or integrate with existing auth systems for larger applications
+- Allow users to set custom display names, or get display name from session
+- User profiles and avatars
+
+### Chat Features
+
+- **Multiple Chat Rooms**:
+  - Add `ChatRoom` model with foreign key association to messages
+  - Room-based message filtering and routing
+- **Message Reactions**: Emoji reactions to messages
+- **File Attachments**: Support for image/file sharing
+- **Message Editing/Deletion**: Allow users to edit or delete their own messages
+- **Message comment threads**: Comment directly on a specific message to start a thread
+- **Handle failed message sends**: Show grey message with red exclamation point if it didn't send successfully
+
+### Performance & UX
+
+- **Infinite Scroll**: Implement infinite scroll in the frontend using the paginated messages API
+- **Message Search**: Search functionality for finding specific messages
+- **Message Persistence**: Configurable message retention policies
+- **Connection Recovery**: Automatic message recovery when reconnecting after disconnection
+
+### Security & Reliability
+
+- **Rate Limiting**: Implement rate limiting to prevent spam and abuse
+- **Message Encryption**: End-to-end encryption for sensitive conversations
+- **Audit Logging**: Track message history and user actions

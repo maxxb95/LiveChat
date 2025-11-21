@@ -5,6 +5,17 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
+  # ActionCable WebSocket endpoint
+  mount ActionCable.server => '/cable'
+
+  # API routes
+  namespace :api do
+    # Messages API
+    resources :messages, only: [:index, :create]
+    # Get current user's IP address
+    get 'ip', to: 'ip#show'
+  end
+
   # Defines the root path route ("/")
   # root "posts#index"
 end
