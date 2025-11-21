@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const getResponse = ref<string>('')
 const postResponse = ref<string>('')
 const loading = ref({ get: false, post: false })
@@ -13,7 +12,7 @@ const testGet = async () => {
   getResponse.value = ''
 
   try {
-    const response = await fetch(`${apiUrl}/test`)
+    const response = await fetch(`/api/test`)
     const data = await response.json()
     getResponse.value = JSON.stringify(data, null, 2)
   } catch (err) {
@@ -30,7 +29,7 @@ const testPost = async () => {
   postResponse.value = ''
 
   try {
-    const response = await fetch(`${apiUrl}/test`, {
+    const response = await fetch(`/api/test`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -54,8 +53,6 @@ const testPost = async () => {
 <template>
   <div class="test-connection">
     <h2>Backend Connection Test</h2>
-    <p class="api-url">API URL: {{ apiUrl }}</p>
-
     <div class="test-section">
       <div class="test-controls">
         <h3>GET Request</h3>

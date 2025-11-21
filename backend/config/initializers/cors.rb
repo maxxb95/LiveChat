@@ -7,7 +7,13 @@
 
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins "http://localhost:5173", "http://127.0.0.1:5173"
+    # Allow localhost and ngrok domains
+    origins(
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://messenger.loca.lt",
+      /https?:\/\/.*\.loca\.lt/
+    )
 
     resource "*",
       headers: :any,

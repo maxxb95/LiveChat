@@ -51,7 +51,9 @@ services:
     command: npm run dev -- --host
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:3000
+      # Set VITE_API_URL to your backend ngrok URL when using ngrok
+      # Example: VITE_API_URL=https://abc123.ngrok.io
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
     ports:
       - "5173:5173"
     volumes:
