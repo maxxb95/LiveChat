@@ -102,8 +102,12 @@ export const useChatStore = defineStore('chat', () => {
 
   function handleTypingEvent(data: { normalized_ip?: string; is_typing: boolean }) {
     const userIp = data.normalized_ip
+    if (!userIp) {
+      return
+    }
+
     // Ignore self typing
-    if (!userIp || userIp === userNormalizedIp.value) {
+    if (userIp === userNormalizedIp.value) {
       return
     }
 

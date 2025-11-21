@@ -12,6 +12,9 @@ class ChatChannel < ApplicationCable::Channel
     # Broadcast typing status to other users, with normalized_ip to identify the "typer"
     normalized_ip = connection.normalized_ip
     
+    # Don't broadcast if normalized_ip is not available
+    return if normalized_ip.blank?
+    
     ActionCable.server.broadcast(
       'chat_channel',
       {
@@ -26,6 +29,10 @@ class ChatChannel < ApplicationCable::Channel
 
   def broadcast_typing_stopped
     normalized_ip = connection.normalized_ip
+    
+    # Don't broadcast if normalized_ip is not available
+    return if normalized_ip.blank?
+    
     ActionCable.server.broadcast(
       'chat_channel',
       {
