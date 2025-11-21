@@ -21,7 +21,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: api
-    command: bash -c "rm -f tmp/pids/server.pid && rm -rf tmp/cache/bootsnap && bundle exec rails db:migrate && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    command: bash -c "bundle exec rails db:prepare && bundle exec rails s -p 3000 -b '0.0.0.0'"
     environment:
       RAILS_ENV: development
       DATABASE_URL: postgresql://dev:postgres@db:5432/livechat
@@ -37,6 +37,11 @@ services:
         condition: service_healthy
     stdin_open: true
     tty: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://api:3000/up"] # Should respond when Rails is up
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
@@ -53,7 +58,8 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     stdin_open: true
     tty: true
 

@@ -1,7 +1,5 @@
 module Api
   class MessagesController < ApplicationController
-    include ActionView::Helpers::SanitizeHelper
-
     before_action :set_session_id
 
     # GET /api/messages
@@ -39,7 +37,7 @@ module Api
 
     # POST /api/messages
     def create
-      @message = Message.new(sanitized_message_params)
+      @message = Message.new(message_params)
       @message.session_id = @session_id
       @message.ip_address = request.remote_ip
 
@@ -68,15 +66,6 @@ module Api
     rescue ActionController::ParameterMissing => e
       Rails.logger.error("Parameter missing in messages#create: #{e.message}")
       raise
-    end
-
-    def sanitized_message_params
-      params = message_params
-      # Strip HTML tags and sanitize content
-      params[:content] = strip_tags(params[:content]) if params[:content].present?
-      # Trim whitespace
-      params[:content] = params[:content]&.strip
-      params
     end
 
     def set_session_id
