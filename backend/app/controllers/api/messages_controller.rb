@@ -37,6 +37,19 @@ module Api
 
     # POST /api/messages
     def create
+      room_id = message_params[:room_id]
+      
+      if room_id.blank?
+        render json: { error: 'room_id is required' }, status: :bad_request
+        return
+      end
+
+      # Validate that the room exists
+      unless ChatRoomTable.exists?(id: room_id)
+        render json: { error: 'Invalid room_id' }, status: :bad_request
+        return
+      end
+
       @message = Message.new(message_params)
       @message.session_id = @session_id
       @message.ip_address = request.remote_ip
@@ -55,6 +68,26 @@ module Api
       render json: { error: 'Failed to save message', message: 'Database error occurred' }, status: :internal_server_error
     end
 
+    # GET /api/messages/:roomId
+    def by_room
+      room_id = params[:roomId]
+
+      # Check if room exists
+      unless ChatRoomTable.exists?(id: room_id)
+        render json: { error: 'Room not found' }, status: :not_found
+        return
+      end
+
+      @messages = Message.where(room_id: room_id).ordered
+
+      render json: {
+        messages: @messages.map { |m| message_json(m) }
+      }
+    rescue ActiveRecord::StatementInvalid => e
+      Rails.logger.error("Database error in messages#by_room: #{e.message}")
+      render json: { error: 'Failed to retrieve messages', message: 'Database error occurred' }, status: :internal_server_error
+    end
+
     private
 
     def pagination_params
@@ -62,7 +95,7 @@ module Api
     end
 
     def message_params
-      params.require(:message).permit(:content)
+      params.require(:message).permit(:content, :room_id)
     rescue ActionController::ParameterMissing => e
       Rails.logger.error("Parameter missing in messages#create: #{e.message}")
       raise
@@ -77,7 +110,8 @@ module Api
 
     def broadcast_message(message)
       message_data = message_json(message)
-      ActionCable.server.broadcast('chat_channel', message_data)
+      channel_name = message.room_id.present? ? "chat_channel_#{message.room_id}" : 'chat_channel'
+      ActionCable.server.broadcast(channel_name, message_data)
     rescue StandardError => e
       Rails.logger.error("Failed to broadcast message via ActionCable: #{e.message}")
       Rails.logger.error(e.backtrace.join("\n"))
@@ -90,8 +124,8 @@ module Api
         session_id: message.session_id,
         ip_address: message.ip_address,
         normalized_ip: normalize_ip_safely(message.ip_address),
+        room_id: message.room_id,
         created_at: message.created_at,
-        is_mine: message.session_id == @session_id
       }
     rescue StandardError => e
       Rails.logger.error("Error serializing message: #{e.message}")
@@ -102,8 +136,8 @@ module Api
         session_id: message.session_id,
         ip_address: message.ip_address,
         normalized_ip: nil,
+        room_id: message.room_id,
         created_at: message.created_at,
-        is_mine: message.session_id == @session_id
       }
     end
 

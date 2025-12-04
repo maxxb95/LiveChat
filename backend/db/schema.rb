@@ -10,18 +10,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_18_232025) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_03_211904) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "chat_room_tables", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.datetime "updated_at", null: false
+  end
 
   create_table "messages", force: :cascade do |t|
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.string "ip_address"
+    t.integer "room_id"
     t.string "session_id", null: false
     t.datetime "updated_at", null: false
     t.string "username"
     t.index ["created_at"], name: "index_messages_on_created_at"
+    t.index ["room_id"], name: "index_messages_on_room_id"
     t.index ["session_id"], name: "index_messages_on_session_id"
   end
 end

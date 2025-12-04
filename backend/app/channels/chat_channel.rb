@@ -1,6 +1,8 @@
 class ChatChannel < ApplicationCable::Channel
   def subscribed
-    stream_from 'chat_channel'
+    @room_id = params[:room_id]
+    channel_name = channel_name_for_room(@room_id)
+    stream_from channel_name
   end
 
   def unsubscribed
@@ -16,7 +18,7 @@ class ChatChannel < ApplicationCable::Channel
     return if normalized_ip.blank?
     
     ActionCable.server.broadcast(
-      'chat_channel',
+      channel_name_for_room(@room_id),
       {
         type: 'typing',
         normalized_ip: normalized_ip,
@@ -27,6 +29,14 @@ class ChatChannel < ApplicationCable::Channel
   
   private
 
+  def channel_name_for_room(room_id)
+    if room_id.present?
+      "chat_channel_#{room_id}"
+    else
+      'chat_channel'
+    end
+  end
+
   def broadcast_typing_stopped
     normalized_ip = connection.normalized_ip
     
@@ -34,7 +44,7 @@ class ChatChannel < ApplicationCable::Channel
     return if normalized_ip.blank?
     
     ActionCable.server.broadcast(
-      'chat_channel',
+      channel_name_for_room(@room_id),
       {
         type: 'typing',
         normalized_ip: normalized_ip,

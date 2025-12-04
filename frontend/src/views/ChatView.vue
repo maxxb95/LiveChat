@@ -76,10 +76,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { formatDistanceToNow } from 'date-fns'
 import { useChatStore } from '../stores/chat'
 
+const route = useRoute()
 const chatStore = useChatStore()
 // Use storeToRefs to maintain reactivity when destructuring
 const { messages, isLoading, error, hasMessages, isConnected, typingUsers } = storeToRefs(chatStore)
@@ -176,11 +178,41 @@ const formatTime = (dateString: string) => {
   return dateString
 }
 
+const getRoomIdFromRoute = (): number | undefined => {
+  const roomIdParam = route.params.roomId
+  if (roomIdParam && typeof roomIdParam === 'string') {
+    const roomId = parseInt(roomIdParam, 10)
+    return isNaN(roomId) ? undefined : roomId
+  }
+  return undefined
+}
+
 onMounted(async () => {
-  connect()
+  const roomId = getRoomIdFromRoute()
+  if (roomId) {
+    connect(roomId)
+  } else {
+    // TODO
+    throw new Error('Room ID is required')
+  }
   await fetchMessages()
   focusMessageInput()
 })
+
+// Watch for route changes to reconnect when roomId changes
+watch(
+  () => route.params.roomId,
+  async (newRoomId) => {
+    disconnect()
+    const roomId = newRoomId && typeof newRoomId === 'string' ? parseInt(newRoomId, 10) : undefined
+    if (roomId && !isNaN(roomId)) {
+      connect(roomId)
+    } else {
+      throw new Error('Room ID is required')
+    }
+    await fetchMessages()
+  },
+)
 
 onUnmounted(() => {
   if (typingTimeout) {

@@ -12,6 +12,9 @@ Rails.application.routes.draw do
   namespace :api do
     # Messages API
     resources :messages, only: [:index, :create]
+    get 'messages/:roomId', to: 'messages#by_room', as: 'messages_by_room'
+    # Chat Room Tables API
+    resources :chat_room_tables, only: [:index, :create]
     # Get current user's IP address
     get 'ip', to: 'ip#show'
   end

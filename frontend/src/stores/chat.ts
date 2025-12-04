@@ -9,8 +9,8 @@ export interface Message {
   session_id: string
   ip_address?: string
   normalized_ip?: string
+  room_id?: number
   created_at: string
-  is_mine?: boolean
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -22,6 +22,7 @@ export const useChatStore = defineStore('chat', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const typingUsers = ref<Set<string>>(new Set())
+  const roomId = ref<number | null>(null)
   let cable: any = null
   let subscription: any = null
 
@@ -34,9 +35,18 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // Initialize ActionCable connection
-  async function connect() {
+  async function connect(roomIdParam?: number) {
     if (cable) {
       disconnect()
+    }
+
+    if (roomIdParam) {
+      roomId.value = roomIdParam
+    }
+
+    if (!roomId.value) {
+      error.value = 'Room ID is required to connect'
+      return
     }
 
     await fetchUserIp()
@@ -46,7 +56,7 @@ export const useChatStore = defineStore('chat', () => {
       error.value = null
 
       subscription = cable.subscriptions.create(
-        { channel: 'ChatChannel' },
+        { channel: 'ChatChannel', room_id: roomId.value },
         {
           received(data: any) {
             if (data.type === 'typing') {
@@ -156,11 +166,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function fetchMessages() {
+    if (!roomId.value) {
+      error.value = 'Room ID is required to fetch messages'
+      return
+    }
+
     isLoading.value = true
     error.value = null
 
     try {
-      const response = await fetch(`/api/messages`, {
+      const response = await fetch(`/api/messages/${roomId.value}`, {
         headers: {
           'X-Session-ID': sessionId.value,
           'Content-Type': 'application/json',
@@ -187,6 +202,11 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
+    if (!roomId.value) {
+      error.value = 'Room ID is required to send messages'
+      throw new Error('Room ID is required to send messages')
+    }
+
     isLoading.value = true
     error.value = null
 
@@ -200,6 +220,7 @@ export const useChatStore = defineStore('chat', () => {
         body: JSON.stringify({
           message: {
             content: msg.trim(),
+            room_id: roomId.value,
           },
         }),
       })
@@ -233,6 +254,7 @@ export const useChatStore = defineStore('chat', () => {
     isLoading,
     error,
     typingUsers,
+    roomId,
     // Computed
     messageCount,
     hasMessages,

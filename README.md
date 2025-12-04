@@ -270,3 +270,26 @@ LiveChat/
 - **Rate Limiting**: Implement rate limiting to prevent spam and abuse
 - **Message Encryption**: End-to-end encryption for sensitive conversations
 - **Audit Logging**: Track message history and user actions
+
+
+
+Multiple Chat Rooms Plan:
+
+Model
+* Room - links to messages with fk
+* Messages - update to add room relationship (required)
+
+Controller
+* Create Room - POST { displayName: string }
+* List Rooms - GET all room (nice to have pagination)
+* Get Room by ID - GET room 
+* Update the Create Messages controller to accept a room ID - POST
+* Get messages by room ID - GET /messages/:roomId
+
+Frontend Pages
+* Create room with single input display name
+* base url will go to the listed rooms + button to add room
+* /roomId will go to a chat with messages populated by GET /messages/:roomId
+
+Channels
+* attach roomId to the channel so that we can have muultiple channels and each room isn't getting
